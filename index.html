@@ -207,7 +207,53 @@ also had the same LaTeX. Validation and test lost nothing.</p>
 <p class='note prose'>From <code>tools/model_prep/finetune_changes.py</code>.</p>
 <!-- finetune-changes:end -->
 
+<!-- online-vs-offline:start -->
+<h2 id='online-vs-offline'>Online vs offline model on the same test formulas</h2>
+<p class='prose'>The app has two formula readers. <strong>Offline</strong>: PP-FormulaNet_plus-S, the small model that runs on
+the phone (the shipped model, not the fine-tuned one). <strong>Online</strong>: PaddleOCR-VL-1.6, the large vision-language
+model the online pipeline uses, run here on the laptop's GPU with the formula prompt on each cropped image (no layout
+detection). Both read the same 120 im2latex test formulas; the online model was scored on them once. No training,
+no app changes.</p>
+<div class='facts'>
+  <div class='fact'><b>58 &rarr; 50</b><span>strictly right of 120: offline &rarr; online</span></div>
+  <div class='fact'><b>84 &rarr; 84</b><span>spacing-normalized: offline &rarr; online</span></div>
+  <div class='fact'><b>655 ms</b><span>offline, median per formula (laptop CPU, 4 threads)</span></div>
+  <div class='fact'><b>4,225 ms</b><span>online, median per formula (laptop GPU)</span></div>
+</div>
+<p class='prose'>Spacing-normalized ignores LaTeX spacing commands, as in the runs above. The two times come from
+different hardware, so they are not a speed race: the offline time is on the laptop CPU at the phone's thread count
+(the phone itself was not timed here), the online time is the laptop GPU and leaves out the 32.96 s it
+took to load the model once, and any network time a real online request would add.</p>
+<h3>Per topic and length</h3>
+<div class='tablewrap'><table><thead><tr><th>Group</th><th>Items</th><th>Offline, strict</th><th>Online, strict</th>
+<th>Offline, spacing-normalized</th><th>Online, spacing-normalized</th></tr></thead><tbody><tr><th scope='row'>exponents</th><td>17</td><td>14/17</td><td>12/17</td><td>14/17</td><td>12/17</td></tr><tr><th scope='row'>fractions</th><td>54</td><td>21/54</td><td>17/54</td><td>34/54</td><td>33/54</td></tr><tr><th scope='row'>function notation</th><td>3</td><td>3/3</td><td>2/3</td><td>3/3</td><td>2/3</td></tr><tr><th scope='row'>inequalities</th><td>10</td><td>2/10</td><td>2/10</td><td>6/10</td><td>7/10</td></tr><tr><th scope='row'>linear equations</th><td>15</td><td>8/15</td><td>7/15</td><td>11/15</td><td>12/15</td></tr><tr><th scope='row'>polynomials</th><td>1</td><td>0/1</td><td>0/1</td><td>1/1</td><td>1/1</td></tr><tr><th scope='row'>quadratic equations</th><td>8</td><td>5/8</td><td>5/8</td><td>7/8</td><td>7/8</td></tr><tr><th scope='row'>radicals</th><td>12</td><td>5/12</td><td>5/12</td><td>8/12</td><td>10/12</td></tr><tr><th scope='row'>length &lt;=20 (simple)</th><td>24</td><td>13/24</td><td>11/24</td><td>19/24</td><td>16/24</td></tr><tr><th scope='row'>length 21-40</th><td>62</td><td>31/62</td><td>29/62</td><td>45/62</td><td>49/62</td></tr><tr><th scope='row'>length &gt;40</th><td>34</td><td>14/34</td><td>10/34</td><td>20/34</td><td>19/34</td></tr></tbody></table></div>
+<h3>How the readings differ from the correct LaTeX</h3>
+<p class='prose'>Each of the 120 readings counted once.</p>
+<div class='tablewrap'><table><thead><tr><th>Reading</th><th>Offline</th><th>Online</th></tr></thead><tbody><tr><th scope='row'>Right (strict)</th><td>58</td><td>50</td></tr><tr><th scope='row'>Spacing only</th><td>26</td><td>34</td></tr><tr><th scope='row'>Same meaning, other notation</th><td>13</td><td>16</td></tr><tr><th scope='row'>Meaning-changing</th><td>23</td><td>20</td></tr></tbody></table></div>
+
+<h2 id='review-signal'>Agreement as a review signal</h2>
+<p class='prose'>Idea: when the phone is online, read each formula with both models; if the two readings agree, trust the
+offline reading; if they differ, ask the student to check it. Measured on the same 120 test formulas from the saved
+readings (no new runs). Agree and right are both spacing-normalized. Not built in the app.</p>
+<div class='facts'>
+  <div class='fact'><b>88/120</b><span>readings agree (73%)</span></div>
+  <div class='fact'><b>71/88</b><span>right when they agree (81%)</span></div>
+  <div class='fact'><b>19/32</b><span>offline reading wrong when they disagree</span></div>
+  <div class='fact'><b>19 of 36</b><span>offline errors a disagree flag catches</span></div>
+</div>
+<p class='prose'>A &ldquo;flag when they disagree&rdquo; rule would flag 32 of 120 readings. It catches
+19 of the offline model's 36 wrong readings and misses 17: those are
+cases where both models made the same mistake. It also flags 13 of the
+84 right offline readings, where the online model was the one that was wrong. When they disagree, the
+online reading is right 13 times of 32. These numbers are from im2latex's
+physics-paper formulas, not our worksheets.</p>
+<p class='note prose'>Offline scores from the run of 2026-11-10 (shipped ONNX, app preprocessing); online run 2026-11-11 with
+<code>tools/training_vl/evaluate_vl.py --engine local --mode prompt</code>; comparison from
+<code>tools/training_vl/compare_online_offline.py</code>. Errors in the online run: 0.</p>
+<!-- online-vs-offline:end -->
+
 <footer>Generated 2026-11-10 from <code>tools/dataset/im2latex_filter_report.py</code> and
 <code>tools/model_prep/train_formula.py</code> outputs; the fine-tuning analysis added 2026-11-11 from
-<code>tools/model_prep/finetune_changes.py</code>. Numbers are counts from those runs; nothing here is estimated.</footer>
+<code>tools/model_prep/finetune_changes.py</code>, and the online vs offline comparison from
+<code>tools/training_vl/evaluate_vl.py</code>. Numbers are counts from those runs; nothing here is estimated.</footer>
 </div>
